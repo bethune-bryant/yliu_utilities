@@ -36,16 +36,26 @@ LRATE = 0.5e-4
 JOBID = 'r_' + str(random.randint(1, 1000000))
 WUP = 3
 
-ROOT = '/mnt/bb/USERID/'
+#ROOT = '/mnt/bb/USERID/'
 
-if hvd.rank() == 0:
-    print('train sample:', len(glob.glob(os.path.join(ROOT, 'trainimg', 'train', '*.png'))))
-    print('val sample:', len(glob.glob(os.path.join(ROOT, 'valimg', 'val', '*.png'))))
+#if hvd.rank() == 0:
+#    print('train sample:', len(glob.glob(os.path.join(ROOT, 'trainimg', 'train', '*.png'))))
+#    print('val sample:', len(glob.glob(os.path.join(ROOT, 'valimg', 'val', '*.png'))))
 
 if len(sys.argv) == 2:
     JOBID = sys.argv[1]
 
 smooth = 0.01
+
+def load_train_data():
+    n_samples = 562
+    #imgs_train = np.load(os.path.join(ROOT, 'img_20191216_aug_' +str(ddl.rank()) + '.npy'))
+    imgs_train = np.random.randint(low=0, high=256, size=(n_samples, IMG_SIZE, IMG_SIZE, 3))
+    #imgs_mask_train = np.load(os.path.join(ROOT, 'labelOnehot_20191216_aug_binary_' +str(ddl.rank()) + '.npy'))
+    identity = np.eye(4)
+    #imgs_mask_train = identity[np.random.choice(identity.shape[0], size=(n_samples, IMG_SIZE, IMG_SIZE))]
+    imgs_mask_train = np.random.randint(low=0, high=2, size=(n_samples, IMG_SIZE, IMG_SIZE))
+    return imgs_train, imgs_mask_train
 
 def f1(y_true_f, y_pred_f):
     intersection = K.sum(y_true_f * y_pred_f)
@@ -135,45 +145,48 @@ if hvd.rank() == 0:
     cbs.append(ModelCheckpoint(JOBID+'.h5', monitor='val_loss', verbose=verbose, save_best_only=True,
                               save_weights_only=True, mode='auto', period=1))
 
-train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1./255)
-train_datagen1 = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1.)
+# train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1./255)
+# train_datagen1 = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1.)
 
-train_img_generator = train_datagen.flow_from_directory(
-    os.path.join(ROOT, 'trainimg'),
-    target_size=(IMG_SIZE, IMG_SIZE),
-    class_mode=None,
-    batch_size = BATCH_SIZE)
+#train_img_generator = train_datagen.flow_from_directory(
+#    os.path.join(ROOT, 'trainimg'),
+#    target_size=(IMG_SIZE, IMG_SIZE),
+#    class_mode=None,
+#    batch_size = BATCH_SIZE)
 
-train_msk_generator = train_datagen1.flow_from_directory(
-    os.path.join(ROOT, 'trainmsk',),
-    target_size=(IMG_SIZE, IMG_SIZE),
-    class_mode=None,
-    color_mode='grayscale',
-    batch_size = BATCH_SIZE)
+#train_msk_generator = train_datagen1.flow_from_directory(
+#    os.path.join(ROOT, 'trainmsk',),
+#    target_size=(IMG_SIZE, IMG_SIZE),
+#    class_mode=None,
+#    color_mode='grayscale',
+#    batch_size = BATCH_SIZE)
 
-val_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1./255)
-val_datagen1 = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1.)
+# val_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1./255)
+# val_datagen1 = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1.)
 
-val_img_generator = val_datagen.flow_from_directory(
-    os.path.join(ROOT, 'valimg'),
-    target_size=(IMG_SIZE, IMG_SIZE),
-    class_mode=None,
-    batch_size = BATCH_SIZE)
+# val_img_generator = val_datagen.flow_from_directory(
+#     os.path.join(ROOT, 'valimg'),
+#     target_size=(IMG_SIZE, IMG_SIZE),
+#     class_mode=None,
+#     batch_size = BATCH_SIZE)
 
-val_msk_generator = val_datagen1.flow_from_directory(
-    os.path.join(ROOT, 'valmsk'),
-    target_size=(IMG_SIZE, IMG_SIZE),
-    class_mode=None,
-    color_mode='grayscale',
-    batch_size = BATCH_SIZE)
+# val_msk_generator = val_datagen1.flow_from_directory(
+#     os.path.join(ROOT, 'valmsk'),
+#     target_size=(IMG_SIZE, IMG_SIZE),
+#     class_mode=None,
+#     color_mode='grayscale',
+#     batch_size = BATCH_SIZE)
+
+imgs_train, imgs_mask_train = load_train_data()
+
+imgs_train = imgs_train.astype(np.float32) / 255.
+imgs_mask_train = imgs_mask_train.astype(np.float32)
 
 # Train the model
 UNet.fit(
-    zip(train_img_generator, train_msk_generator),
-    steps_per_epoch = len(train_img_generator) // hvd.size(),
+    imgs_train, imgs_mask_train,
+    batch_size = 24,
     epochs = 40,
     verbose = verbose,
     workers = 4,
-    validation_data = zip(val_img_generator, val_msk_generator),
-    validation_steps = 3*len(val_img_generator) // hvd.size(),
     callbacks = cbs)
