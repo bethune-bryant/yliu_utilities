@@ -142,7 +142,7 @@ cbs = [
 
 # Horovod: save checkpoints only on worker 0 to prevent other workers from corrupting them.
 if hvd.rank() == 0:
-    cbs.append(ModelCheckpoint(JOBID+'.h5', monitor='val_loss', verbose=verbose, save_best_only=True,
+    cbs.append(ModelCheckpoint("/mnt/bb/USERID/" + JOBID+'.h5', monitor='val_loss', verbose=verbose, save_best_only=True,
                               save_weights_only=True, mode='auto', period=1))
 
 # train_datagen = tf.keras.preprocessing.image.ImageDataGenerator(rescale = 1./255)
@@ -182,9 +182,16 @@ imgs_train, imgs_mask_train = load_train_data()
 imgs_train = imgs_train.astype(np.float32) / 255.
 imgs_mask_train = imgs_mask_train.astype(np.float32)
 
+imgs_val, imgs_mask_val = load_train_data()
+
+imgs_val = imgs_val.astype(np.float32) / 255.
+imgs_mask_val = imgs_mask_val.astype(np.float32)
+
+
 # Train the model
 UNet.fit(
     imgs_train, imgs_mask_train,
+    validation_data = (imgs_val, imgs_mask_val),
     batch_size = 24,
     epochs = 40,
     verbose = verbose,
